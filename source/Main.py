@@ -10,7 +10,7 @@ import math
 
 #graphics component
 class BoxItem(QtGui.QGraphicsItem):
-    def __init__(self,posX,posY,width,height,label,command,penColor,brushColor):
+    def __init__(self,posX,posY,width,height,label,command,penColor,penIndex,brushColor,brushIndex):
         super(BoxItem, self).__init__()
         self.posX = posX
         self.posY = posY
@@ -19,7 +19,9 @@ class BoxItem(QtGui.QGraphicsItem):
         self.label = label
         self.command = command
         self.penColor = penColor
+        self.penIndex = penIndex
         self.brushColor = brushColor
+        self.brushIndex = brushIndex
         self.setAcceptHoverEvents(True)
            
     def boundingRect(self):
@@ -46,7 +48,6 @@ class BoxItem(QtGui.QGraphicsItem):
     
     def mousePressEvent(self, event):
         self.update()
-        print self.command
         QtGui.QGraphicsItem.mousePressEvent(self, event)
   
     def mouseReleaseEvent(self, event):
@@ -75,10 +76,10 @@ class BoxScene(QtGui.QGraphicsScene):
            
     def addBox(self,label = '',command = '',fill = 0,stroke  = 1,posX = 1,posY = 1,width = 10,height = 10):
         strokeRGB =  ColorPickerSlider.colorFromIndex(stroke)
-        penRGB = ColorPickerSlider.colorFromIndex(fill)
+        filRGB = ColorPickerSlider.colorFromIndex(fill)
         penColor = QtGui.QColor(strokeRGB[0],strokeRGB[1],strokeRGB[2])
-        brushColor = QtGui.QColor(penRGB[0],penRGB[1],penRGB[2])
-        item = BoxItem(posX,posY,width,height,label,command,penColor,brushColor)
+        brushColor = QtGui.QColor(filRGB[0],filRGB[1],filRGB[2])
+        item = BoxItem(posX,posY,width,height,label,command,penColor,stroke,brushColor,fill)
         item.setFlag(QtGui.QGraphicsItem.ItemIsMovable)
         item.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
         self.addItem(item)
@@ -96,12 +97,14 @@ class BoxScene(QtGui.QGraphicsScene):
         #boundary.setBrush()
         
     def itemInfo(self):
-        print 'selection changed'
-        selectedItems = self.selectedItems()
-        for item in selectedItems:
-            print item
-            print item.label
-            print item.command
+        #=======================================================================
+        # selectedItems = self.selectedItems()
+        # for item in selectedItems:
+        #     print item
+        #     print item.label
+        #     print item.command
+        #=======================================================================
+        pass
             
 class GraphicsView(QtGui.QGraphicsView):
     def __init__(self,parent = None):
@@ -158,7 +161,6 @@ class GraphicsView(QtGui.QGraphicsView):
     def mouseMoveEvent(self, event):
         if self._doPan:
             mouseDelta = self._lastMousePos -  event.pos()
-            print self._lastMousePos, event.pos()
             self.pan(mouseDelta)
         super(GraphicsView, self).mouseMoveEvent(event)
         self._lastMousePos = event.pos()
@@ -177,21 +179,12 @@ class GraphicsView(QtGui.QGraphicsView):
     def pan(self, delta):        
         delta *= self._scale
         delta *= self._panSpeed
-        #=======================================================================
-        # self.setTransformationAnchor(QtGui.QGraphicsView.AnchorUnderMouse)
-        # newCenter = QtCore.QPoint((self.VIEW_WIDTH/2) - delta.x(),  (self.VIEW_HEIGHT/2) - delta.y())
-        # print self.mapToScene(newCenter).x(),self.mapToScene(newCenter).y()
-        # self.centerOn(self.mapToScene(newCenter))
-        # 
-        #=======================================================================
-        print delta.x(),delta.y()
         self.setTransformationAnchor(QtGui.QGraphicsView.AnchorUnderMouse)
         sceneRect = self.scene().sceneRect()
         self.scene().setSceneRect(self.sceneRect().x()+delta.x(), self.sceneRect().y()+delta.y(), sceneRect.width(), sceneRect.height())
         
     def setMaxSize(self):
         pass
-
 
 #ui elements
 class ColorPickerSlider(QtGui.QWidget):
@@ -447,6 +440,8 @@ class GraphicMainWin(QtGui.QMainWindow):
         self.centralWidget.itemAddButton.clicked.connect(self.addItem)
         self.centralWidget.removeItemButton.clicked.connect(self.removeItem)
         
+        self.centralWidget.scene.selectionChanged.connect(self.setOptions)
+        
     def addItem(self):
         posX = self.itemOptions.itemPosXBox.value()
         posY = self.itemOptions.itemPosYBox.value()
@@ -471,6 +466,27 @@ class GraphicMainWin(QtGui.QMainWindow):
         
         dock.setWidget(self.itemOptions)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        
+    def setOptions(self):
+        try:
+            selectedItem = self.centralWidget.scene.selectedItems()[-1]
+            pos = selectedItem.pos()
+            size =  selectedItem.boundingRect()
+            label =  selectedItem.label 
+            command =  selectedItem.command
+            penIndex =  selectedItem.penIndex
+            brushIndex = selectedItem.brushIndex
+            
+            self.itemOptions.itemPosXBox.setValue(pos.x())
+            self.itemOptions.itemPosYBox.setValue(pos.y())
+            self.itemOptions.itemWidthBox.setValue(size.width())
+            self.itemOptions.itemHeightBox.setValue(size.height())
+            self.itemOptions.boxText.setText(label) 
+            self.itemOptions.boxCommandText.setText(command)
+            self.itemOptions.penColorPicker.slider.setValue(penIndex)
+            self.itemOptions.brushColorPicker.slider.setValue(brushIndex)
+        except:
+            pass
         
 def main():
         app = QtGui.QApplication(sys.argv)
