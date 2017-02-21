@@ -10,20 +10,21 @@ import math
 
 #graphics component
 class BoxItem(QtGui.QGraphicsItem):
-    def __init__(self,posX,posY,width,height,label,command,penColor,penIndex,brushColor,brushIndex):
+    def __init__(self,**kwargs):
         super(BoxItem, self).__init__()
-        self.posX = posX
-        self.posY = posY
-        self.width = width
-        self.height = height
-        self.label = label
-        self.command = command
-        self.penColor = penColor
-        self.penIndex = penIndex
-        self.brushColor = brushColor
-        self.brushIndex = brushIndex
-        self.setAcceptHoverEvents(True)
-           
+        self.posX = kwargs.get('posX',0)
+        self.posY = kwargs.get('posY',0)
+        self.width = kwargs.get('width',20)
+        self.height = kwargs.get('height',20)
+        self.label = kwargs.get('label','temp')
+        self.command = kwargs.get('command',None)
+        self.penColor = kwargs['penColor']
+        self.penIndex = kwargs['penIndex']
+        self.brushColor = kwargs['brushColor']
+        self.brushIndex = kwargs['brushIndex']
+        self.type = kwargs.get('type','ellipse')
+        self.setAcceptHoverEvents(True) 
+         
     def boundingRect(self):
         return QtCore.QRectF(self.posX,self.posY,self.width,self.height)
 
@@ -43,7 +44,14 @@ class BoxItem(QtGui.QGraphicsItem):
         pen.setColor(penColor)
         painter.setBrush(brushColor)
         painter.setPen(pen)
-        painter.drawRoundedRect(self.posX,self.posY,self.width,self.height,5,5)
+        if self.type == 'rect':
+            painter.drawRect(self.posX,self.posY,self.width,self.height)
+        elif self.type == 'roundRect':
+            painter.drawRoundedRect(self.posX,self.posY,self.width,self.height,5,5)
+        elif self.type == 'ellipse':
+            rect = QtCore.QRect(self.posX,self.posY,self.width,self.height)
+            painter.drawEllipse(rect)
+                   
         painter.drawText(self.boundingRect(),QtCore.Qt.AlignCenter,self.label)
     
     def mousePressEvent(self, event):
@@ -74,12 +82,14 @@ class BoxScene(QtGui.QGraphicsScene):
         self.setSceneRect(rect)
         self.drawBoundary()
            
-    def addBox(self,label = '',command = '',fill = 0,stroke  = 1,posX = 1,posY = 1,width = 10,height = 10):
+    def addBox(self,label = '',command = '',fill = 0,stroke  = 1,posX = 1,posY = 1,width = 10,height = 10,type = 'rect'):
         strokeRGB =  ColorPickerSlider.colorFromIndex(stroke)
         filRGB = ColorPickerSlider.colorFromIndex(fill)
         penColor = QtGui.QColor(strokeRGB[0],strokeRGB[1],strokeRGB[2])
         brushColor = QtGui.QColor(filRGB[0],filRGB[1],filRGB[2])
-        item = BoxItem(posX,posY,width,height,label,command,penColor,stroke,brushColor,fill)
+        item = BoxItem(posX = posX,posY = posY,width = width,height = height,label = label,command = command,
+                       penColor = penColor,penIndex = stroke,brushColor = brushColor,
+                       brushIndex = fill,type = type)
         item.setFlag(QtGui.QGraphicsItem.ItemIsMovable)
         item.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
         self.addItem(item)
@@ -167,7 +177,7 @@ class GraphicsView(QtGui.QGraphicsView):
           
     def wheelEvent(self, event):
         self.setResizeAnchor(QtGui.QGraphicsView.AnchorUnderMouse)
-        self.scaleView(math.pow(2.0, -event.delta() / 240.0))
+        self.scaleView(math.pow(2.0, event.delta() / 240.0))
         
     def scaleView(self, scaleFactor):
         factor = self.matrix().scale(scaleFactor, scaleFactor).mapRect(QtCore.QRectF(0, 0, 1, 1)).width()
@@ -357,12 +367,29 @@ class BoxItemOptionsWidget(QtGui.QWidget):
         optionsLayout.addWidget(spinBoxWidgets)
         
         boxTextWidget = QtGui.QWidget()
-        boxTextLayout = QtGui.QVBoxLayout()
+        boxTextLayout = QtGui.QHBoxLayout()
         boxTextWidget.setLayout(boxTextLayout)
+        typeLabel = QtGui.QLabel('Type')
+        self.typeBox = QtGui.QComboBox()
+        self.typeBox.addItem('rect')
+        self.typeBox.addItem('roundRect')
+        self.typeBox.addItem('ellipse')
+        self.typeBox.addItem('polygon')
         boxTextLabel = QtGui.QLabel('Label:')
         self.boxText = QtGui.QLineEdit('temp')
+        
+        boxTextLayout.addWidget(typeLabel)
+        boxTextLayout.addWidget(self.typeBox)
+        boxTextLayout.addWidget(boxTextLabel)
+        boxTextLayout.addWidget(self.boxText)
+        
+        boxCommandWidget = QtGui.QWidget()
+        boxCommandLayout = QtGui.QVBoxLayout()
+        boxCommandWidget.setLayout(boxCommandLayout)
         boxCommandLabel = QtGui.QLabel('Command:')
         self.boxCommandText = QtGui.QTextEdit()
+        boxCommandLayout.addWidget(boxCommandLabel)
+        boxCommandLayout.addWidget(self.boxCommandText)
 
         textEditStyle = '''QTextEdit {border: 2px solid #8f8f91;border-radius: 6px;
                         background-color: rgb(85, 85, 85);
@@ -371,11 +398,6 @@ class BoxItemOptionsWidget(QtGui.QWidget):
         
         self.boxCommandText.setStyleSheet(textEditStyle)
         self.boxCommandText.setTabStopWidth(20)
-
-        boxTextLayout.addWidget(boxTextLabel)
-        boxTextLayout.addWidget(self.boxText)
-        boxTextLayout.addWidget(boxCommandLabel)
-        boxTextLayout.addWidget(self.boxCommandText)
         
         itemSizeLayout.addWidget(itemWidthWidget)
         itemSizeLayout.addWidget(itemHeightWidget)
@@ -388,6 +410,7 @@ class BoxItemOptionsWidget(QtGui.QWidget):
         
         self.mainLayout.addWidget(boxTextWidget)
         self.mainLayout.addWidget(optionsWidget)
+        self.mainLayout.addWidget(boxCommandWidget)
         self.mainLayout.setSpacing(0)
         
 class CentralWidget(QtGui.QWidget):
@@ -450,9 +473,11 @@ class GraphicMainWin(QtGui.QMainWindow):
         stroke = self.itemOptions.penColorPicker.slider.value()
         fill = self.itemOptions.brushColorPicker.slider.value()
         label = self.itemOptions.boxText.text()
+        type = self.itemOptions.typeBox.currentText()
         command = self.itemOptions.boxCommandText.toPlainText()
         self.centralWidget.scene.addBox(posX = posX,posY = posY,height = height, width = width,
-                                        label = label,command = command,stroke = stroke,fill = fill)
+                                        label = label,command = command,stroke = stroke,fill = fill,
+                                        type = type)
     def removeItem(self):
         selectedItems = self.centralWidget.scene.selectedItems()
         for item in selectedItems:
@@ -476,7 +501,9 @@ class GraphicMainWin(QtGui.QMainWindow):
             command =  selectedItem.command
             penIndex =  selectedItem.penIndex
             brushIndex = selectedItem.brushIndex
-            
+            type = selectedItem.type
+            typeIndex = self.itemOptions.typeBox.findText(type, QtCore.Qt.MatchFixedString)
+
             self.itemOptions.itemPosXBox.setValue(pos.x())
             self.itemOptions.itemPosYBox.setValue(pos.y())
             self.itemOptions.itemWidthBox.setValue(size.width())
@@ -485,6 +512,7 @@ class GraphicMainWin(QtGui.QMainWindow):
             self.itemOptions.boxCommandText.setText(command)
             self.itemOptions.penColorPicker.slider.setValue(penIndex)
             self.itemOptions.brushColorPicker.slider.setValue(brushIndex)
+            self.itemOptions.typeBox.setCurrentIndex(typeIndex)
         except:
             pass
         
