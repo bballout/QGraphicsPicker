@@ -26,7 +26,7 @@ class BoxItem(QtGui.QGraphicsItem):
         self.setAcceptHoverEvents(True) 
          
     def boundingRect(self):
-        return QtCore.QRectF(self.posX,self.posY,self.width,self.height)
+        return QtCore.QRectF(0,0,self.width,self.height)
 
     def paint(self, painter, option, widget):
         pen = QtGui.QPen()
@@ -45,11 +45,11 @@ class BoxItem(QtGui.QGraphicsItem):
         painter.setBrush(brushColor)
         painter.setPen(pen)
         if self.type == 'rect':
-            painter.drawRect(self.posX,self.posY,self.width,self.height)
+            painter.drawRect(0,0,self.width,self.height)
         elif self.type == 'roundRect':
-            painter.drawRoundedRect(self.posX,self.posY,self.width,self.height,5,5)
+            painter.drawRoundedRect(0,0,self.width,self.height,5,5)
         elif self.type == 'ellipse':
-            rect = QtCore.QRect(self.posX,self.posY,self.width,self.height)
+            rect = QtCore.QRect(0,0,self.width,self.height)
             painter.drawEllipse(rect)
                    
         painter.drawText(self.boundingRect(),QtCore.Qt.AlignCenter,self.label)
@@ -90,6 +90,7 @@ class BoxScene(QtGui.QGraphicsScene):
         item = BoxItem(posX = posX,posY = posY,width = width,height = height,label = label,command = command,
                        penColor = penColor,penIndex = stroke,brushColor = brushColor,
                        brushIndex = fill,type = type)
+        item.setPos(QtCore.QPoint(posX,posY))
         item.setFlag(QtGui.QGraphicsItem.ItemIsMovable)
         item.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
         self.addItem(item)
@@ -117,6 +118,7 @@ class BoxScene(QtGui.QGraphicsScene):
         pass
             
 class GraphicsView(QtGui.QGraphicsView):
+    posSignal = QtCore.Signal(QtCore.QObject)
     def __init__(self,parent = None):
         super(GraphicsView, self).__init__(parent)
         self.setDragMode(QtGui.QGraphicsView.RubberBandDrag)
@@ -164,6 +166,12 @@ class GraphicsView(QtGui.QGraphicsView):
             if event.modifiers() in  [QtCore.Qt.ShiftModifier,QtCore.Qt.AltModifier]:
                     for item in self._selected:
                         item.setSelected(True)
+            
+            if self.scene().selectedItems() and len(self.scene().selectedItems()) == 1:
+                pos = self.scene().selectedItems()[0].pos()
+                self.posSignal.emit(pos)
+                print 'emiting...',pos.x(),pos.y()             
+
         self._doPan = False
         self._selected = self.scene().selectedItems()
 
@@ -419,6 +427,9 @@ class CentralWidget(QtGui.QWidget):
         self.mainLayout = QtGui.QVBoxLayout(objectName = 'mainLayout')
         self.setLayout(self.mainLayout)
         
+        defaultScene = BoxScene()
+        self.scenes = [defaultScene]
+        
         itemWidget = QtGui.QGroupBox()
         itemLayout = QtGui.QHBoxLayout()
         itemWidget.setLayout(itemLayout)
@@ -431,13 +442,16 @@ class CentralWidget(QtGui.QWidget):
         itemLayout.addWidget(self.itemAddButton)
         itemLayout.addWidget(self.removeItemButton)
         
-        graphicsView = GraphicsView()
-        self.scene = BoxScene()
-        graphicsView.setScene(self.scene)
-        graphicsView.setBackgroundBrush(QtGui.QBrush(QtCore.Qt.gray, QtCore.Qt.SolidPattern))
+        self.graphicsView = GraphicsView() 
+        self.graphicsView.setBackgroundBrush(QtGui.QBrush(QtCore.Qt.gray, QtCore.Qt.SolidPattern))
+        self.graphicsView.setScene(defaultScene)
         
-        self.mainLayout.addWidget(graphicsView)
+        self.mainLayout.addWidget(self.graphicsView)
         self.mainLayout.addWidget(itemWidget)
+        
+    def addScene(self,scene):
+        self.graphicsView.setScene(scene)
+        self.scenes.append(scene)
         
 class GraphicMainWin(QtGui.QMainWindow):
     def __init__(self,parent = None):
@@ -453,6 +467,7 @@ class GraphicMainWin(QtGui.QMainWindow):
         self.setLayout(layout)
         
         self.centralWidget = CentralWidget(self)
+        scene = self.centralWidget.scenes[0]
         centralLayout = QtGui.QHBoxLayout()
         self.centralWidget.setLayout(centralLayout)
  
@@ -463,9 +478,17 @@ class GraphicMainWin(QtGui.QMainWindow):
         self.centralWidget.itemAddButton.clicked.connect(self.addItem)
         self.centralWidget.removeItemButton.clicked.connect(self.removeItem)
         
-        self.centralWidget.scene.selectionChanged.connect(self.setOptions)
+        for scene in self.centralWidget.scenes:
+            scene.selectionChanged.connect(self.getOptions)
+            
+        self.itemOptions.itemWidthBox.valueChanged.connect(self.setOptions)
+        self.itemOptions.itemHeightBox.valueChanged.connect(self.setOptions)
+        self.itemOptions.itemPosXBox.valueChanged.connect(self.setOptions)
+        self.itemOptions.itemPosYBox.valueChanged.connect(self.setOptions)
+        self.centralWidget.graphicsView.posSignal.connect(self.setItemOptionPos)
         
     def addItem(self):
+        currentScene = self.centralWidget.graphicsView.scene()
         posX = self.itemOptions.itemPosXBox.value()
         posY = self.itemOptions.itemPosYBox.value()
         width = self.itemOptions.itemWidthBox.value()
@@ -473,15 +496,22 @@ class GraphicMainWin(QtGui.QMainWindow):
         stroke = self.itemOptions.penColorPicker.slider.value()
         fill = self.itemOptions.brushColorPicker.slider.value()
         label = self.itemOptions.boxText.text()
-        type = self.itemOptions.typeBox.currentText()
+        typeStr = self.itemOptions.typeBox.currentText()
         command = self.itemOptions.boxCommandText.toPlainText()
-        self.centralWidget.scene.addBox(posX = posX,posY = posY,height = height, width = width,
+        currentScene.addBox(posX = posX,posY = posY,height = height, width = width,
                                         label = label,command = command,stroke = stroke,fill = fill,
-                                        type = type)
+                                        type = typeStr)
     def removeItem(self):
         selectedItems = self.centralWidget.scene.selectedItems()
         for item in selectedItems:
             self.centralWidget.scene.removeItem(item)
+    
+    @QtCore.Slot(QtCore.QPoint)      
+    def setItemOptionPos(self,pos):
+        print 'Slotted...',pos.x(),pos.y()
+        self.itemOptions.itemPosXBox.setValue(pos.x())
+        self.itemOptions.itemPosYBox.setValue(pos.y())
+
         
     def setupDock(self):
         dock = QtGui.QDockWidget('Item Options', self)
@@ -491,19 +521,41 @@ class GraphicMainWin(QtGui.QMainWindow):
         
         dock.setWidget(self.itemOptions)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
-        
+       
     def setOptions(self):
-        try:
-            selectedItem = self.centralWidget.scene.selectedItems()[-1]
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            width = self.itemOptions.itemWidthBox.value()
+            height = self.itemOptions.itemHeightBox.value()
+            
+            posX = self.itemOptions.itemPosXBox.value()
+            posY = self.itemOptions.itemPosYBox.value()
+            
+            item.setPos(QtCore.QPoint(posX,posY))
+            
+            print 'point set at %i %i'%(posX,posY)
+            
+            item.width = width
+            item.height = height
+            item.posX = posX
+            item.posY = posY
+            item.update()
+                 
+    def getOptions(self):
+        selectedItems = self.centralWidget.graphicsView.scene().selectedItems()
+        if len(selectedItems) == 1:
+            selectedItem = selectedItems[-1]
             pos = selectedItem.pos()
             size =  selectedItem.boundingRect()
             label =  selectedItem.label 
             command =  selectedItem.command
             penIndex =  selectedItem.penIndex
             brushIndex = selectedItem.brushIndex
-            type = selectedItem.type
-            typeIndex = self.itemOptions.typeBox.findText(type, QtCore.Qt.MatchFixedString)
-
+            typeStr = selectedItem.type
+            typeIndex = self.itemOptions.typeBox.findText(typeStr, QtCore.Qt.MatchFixedString)
+            
+            print 'point get at %i %i'%(pos.x(),pos.y())
+    
             self.itemOptions.itemPosXBox.setValue(pos.x())
             self.itemOptions.itemPosYBox.setValue(pos.y())
             self.itemOptions.itemWidthBox.setValue(size.width())
@@ -513,9 +565,7 @@ class GraphicMainWin(QtGui.QMainWindow):
             self.itemOptions.penColorPicker.slider.setValue(penIndex)
             self.itemOptions.brushColorPicker.slider.setValue(brushIndex)
             self.itemOptions.typeBox.setCurrentIndex(typeIndex)
-        except:
-            pass
-        
+            
 def main():
         app = QtGui.QApplication(sys.argv)
         fileD = GraphicMainWin()
