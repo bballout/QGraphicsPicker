@@ -494,6 +494,9 @@ class GraphicMainWin(QtGui.QMainWindow):
         self.centralWidget.graphicsView.posSignal.connect(self.setItemPos)
         self.itemOptions.typeBox.activated.connect(self.setItemShape)
         self.itemOptions.boxText.textChanged.connect(self.setItemLabel)
+        self.itemOptions.penColorPicker.slider.valueChanged.connect(self.setItemStroke)
+        self.itemOptions.brushColorPicker.slider.valueChanged.connect(self.setItemBrush)
+        self.itemOptions.boxCommandText.textChanged.connect(self.setItemCommand)
         
     def addItem(self):
         currentScene = self.centralWidget.graphicsView.scene()
@@ -569,7 +572,28 @@ class GraphicMainWin(QtGui.QMainWindow):
         for item in selectedItem:
             item.label = label
             item.update()
-               
+            
+    def setItemStroke(self,colorIndex):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            color = ColorPickerSlider.colorFromIndex(colorIndex)
+            item.penColor = QtGui.QColor(color[0],color[1],color[2])
+            item.penIndex = colorIndex
+            item.update()
+            
+    def setItemBrush(self,colorIndex):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            color = ColorPickerSlider.colorFromIndex(colorIndex)
+            item.brushColor = QtGui.QColor(color[0],color[1],color[2])
+            item.brushIndex = colorIndex
+            item.update()
+            
+    def setItemCommand(self):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            item.command = self.itemOptions.boxCommandText.toPlainText()
+           
     def getOptions(self):
         selectedItems = self.centralWidget.graphicsView.scene().selectedItems()
         if len(selectedItems) == 1:
