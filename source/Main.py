@@ -53,7 +53,13 @@ class BoxItem(QtGui.QGraphicsItem):
             painter.drawEllipse(rect)
                    
         painter.drawText(self.boundingRect(),QtCore.Qt.AlignCenter,self.label)
-    
+        
+    def move(self):
+        pointZero = QtCore.QPoint(0,0)
+        point = QtCore.QPoint(self.posX,self.posY)
+        self.setPos(pointZero)
+        self.setPos(point)
+        
     def mousePressEvent(self, event):
         self.update()
         QtGui.QGraphicsItem.mousePressEvent(self, event)
@@ -481,11 +487,13 @@ class GraphicMainWin(QtGui.QMainWindow):
         for scene in self.centralWidget.scenes:
             scene.selectionChanged.connect(self.getOptions)
             
-        self.itemOptions.itemWidthBox.valueChanged.connect(self.setOptions)
-        self.itemOptions.itemHeightBox.valueChanged.connect(self.setOptions)
-        self.itemOptions.itemPosXBox.valueChanged.connect(self.setOptions)
-        self.itemOptions.itemPosYBox.valueChanged.connect(self.setOptions)
-        self.centralWidget.graphicsView.posSignal.connect(self.setItemOptionPos)
+        self.itemOptions.itemWidthBox.valueChanged.connect(self.setItemWidth)
+        self.itemOptions.itemHeightBox.valueChanged.connect(self.setItemHeight)
+        self.itemOptions.itemPosXBox.valueChanged.connect(self.setItemPosX)
+        self.itemOptions.itemPosYBox.valueChanged.connect(self.setItemPosY)
+        self.centralWidget.graphicsView.posSignal.connect(self.setItemPos)
+        self.itemOptions.typeBox.activated.connect(self.setItemShape)
+        self.itemOptions.boxText.textChanged.connect(self.setItemLabel)
         
     def addItem(self):
         currentScene = self.centralWidget.graphicsView.scene()
@@ -505,13 +513,6 @@ class GraphicMainWin(QtGui.QMainWindow):
         selectedItems = self.centralWidget.scene.selectedItems()
         for item in selectedItems:
             self.centralWidget.scene.removeItem(item)
-    
-    @QtCore.Slot(QtCore.QPoint)      
-    def setItemOptionPos(self,pos):
-        print 'Slotted...',pos.x(),pos.y()
-        self.itemOptions.itemPosXBox.setValue(pos.x())
-        self.itemOptions.itemPosYBox.setValue(pos.y())
-
         
     def setupDock(self):
         dock = QtGui.QDockWidget('Item Options', self)
@@ -521,26 +522,54 @@ class GraphicMainWin(QtGui.QMainWindow):
         
         dock.setWidget(self.itemOptions)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        
+    @QtCore.Slot(QtCore.QPoint)      
+    def setItemPos(self,pos):
+        print 'Slotted...',pos.x(),pos.y()
+        self.itemOptions.itemPosXBox.setValue(pos.x())
+        self.itemOptions.itemPosYBox.setValue(pos.y())
+
        
-    def setOptions(self):
+    def setItemWidth(self,width):
         selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
         for item in selectedItem:
-            width = self.itemOptions.itemWidthBox.value()
-            height = self.itemOptions.itemHeightBox.value()
-            
-            posX = self.itemOptions.itemPosXBox.value()
-            posY = self.itemOptions.itemPosYBox.value()
-            
-            item.setPos(QtCore.QPoint(posX,posY))
-            
-            print 'point set at %i %i'%(posX,posY)
-            
             item.width = width
-            item.height = height
-            item.posX = posX
-            item.posY = posY
             item.update()
-                 
+            item.move()
+            
+    def setItemHeight(self,height):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            item.height = height
+            item.update()
+            item.move()
+            
+    def setItemPosX(self,posX):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            item.posX = posX
+            item.move()
+            
+    def setItemPosY(self,posY):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            item.posY = posY
+            item.move()
+            
+    def setItemShape(self,shapeIndex):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            shapes = ['rect','roundRect','ellipse','polygon']
+            item.type =  shapes[shapeIndex]
+            item.update()
+            item.move()
+            
+    def setItemLabel(self,label):
+        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        for item in selectedItem:
+            item.label = label
+            item.update()
+               
     def getOptions(self):
         selectedItems = self.centralWidget.graphicsView.scene().selectedItems()
         if len(selectedItems) == 1:
