@@ -8,6 +8,9 @@ from PySide import QtCore,QtGui
 import sys
 import math
 
+path = __file__
+iconDir = '%s/icons'%path
+
 #graphics component
 class BoxItem(QtGui.QGraphicsItem):
     def __init__(self,**kwargs):
@@ -442,6 +445,11 @@ class CentralWidget(QtGui.QWidget):
         
         self.itemAddButton = QtGui.QPushButton()
         self.itemAddButton.setText('Add')
+        addMap = QtGui.QPixmap('%s/addItemIcon.png'%iconDir)
+        addIcon = QtGui.QIcon(addMap)
+        self.itemAddButton.setIcon(addIcon)
+        self.itemAddButton.setIconSize(addMap.rect().size())
+        
         self.removeItemButton = QtGui.QPushButton()
         self.removeItemButton.setText('Remove')
         
@@ -459,6 +467,14 @@ class CentralWidget(QtGui.QWidget):
         self.graphicsView.setScene(scene)
         self.scenes.append(scene)
         
+class ToolBar(QtGui.QToolBar):
+    def __init__(self,parent = None):
+        super(ToolBar, self).__init__(parent)
+        addPixMap = QtGui.QPixmap('%s/addItemIcon.bmp'%iconDir)
+        addItemIcon = QtGui.QIcon('%s/addItemIcon.sss'%iconDir)
+        self.addAction(addItemIcon, "New File")
+        self.addSeparator()
+            
 class GraphicMainWin(QtGui.QMainWindow):
     def __init__(self,parent = None):
         super(GraphicMainWin,self).__init__(parent)
@@ -477,8 +493,8 @@ class GraphicMainWin(QtGui.QMainWindow):
         centralLayout = QtGui.QHBoxLayout()
         self.centralWidget.setLayout(centralLayout)
  
-        #menuBar = ToolBoxMenuBar(self)
-        #self.setMenuBar(menuBar)
+        toolbar = ToolBar(self)
+        self.addToolBar(QtCore.Qt.TopToolBarArea ,toolbar)
         self.setCentralWidget(self.centralWidget)
         self.setupDock()
         self.centralWidget.itemAddButton.clicked.connect(self.addItem)
