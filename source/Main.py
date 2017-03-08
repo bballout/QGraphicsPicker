@@ -8,7 +8,8 @@ from PySide import QtCore,QtGui
 import sys
 import math
 
-path = __file__
+filePath = __file__
+path = filePath.split('/Main.py')[0]
 iconDir = '%s/icons'%path
 
 #graphics component
@@ -443,19 +444,6 @@ class CentralWidget(QtGui.QWidget):
         itemLayout = QtGui.QHBoxLayout()
         itemWidget.setLayout(itemLayout)
         
-        self.itemAddButton = QtGui.QPushButton()
-        self.itemAddButton.setText('Add')
-        addMap = QtGui.QPixmap('%s/addItemIcon.png'%iconDir)
-        addIcon = QtGui.QIcon(addMap)
-        self.itemAddButton.setIcon(addIcon)
-        self.itemAddButton.setIconSize(addMap.rect().size())
-        
-        self.removeItemButton = QtGui.QPushButton()
-        self.removeItemButton.setText('Remove')
-        
-        itemLayout.addWidget(self.itemAddButton)
-        itemLayout.addWidget(self.removeItemButton)
-        
         self.graphicsView = GraphicsView() 
         self.graphicsView.setBackgroundBrush(QtGui.QBrush(QtCore.Qt.gray, QtCore.Qt.SolidPattern))
         self.graphicsView.setScene(defaultScene)
@@ -470,9 +458,11 @@ class CentralWidget(QtGui.QWidget):
 class ToolBar(QtGui.QToolBar):
     def __init__(self,parent = None):
         super(ToolBar, self).__init__(parent)
-        addPixMap = QtGui.QPixmap('%s/addItemIcon.bmp'%iconDir)
-        addItemIcon = QtGui.QIcon('%s/addItemIcon.sss'%iconDir)
-        self.addAction(addItemIcon, "New File")
+        addItemIcon = QtGui.QIcon('%s/addItemIcon.png'%iconDir)
+        removeItemIcon = QtGui.QIcon('%s/removeItemIcon.png'%iconDir)
+        
+        self.addItemAction = self.addAction(addItemIcon, "Add Item")
+        self.removeItemAction = self.addAction(removeItemIcon, "Remove Item")
         self.addSeparator()
             
 class GraphicMainWin(QtGui.QMainWindow):
@@ -494,11 +484,12 @@ class GraphicMainWin(QtGui.QMainWindow):
         self.centralWidget.setLayout(centralLayout)
  
         toolbar = ToolBar(self)
+        toolbar.addItemAction.triggered.connect(self.addItem)
+        toolbar.removeItemAction.triggered.connect(self.removeItem)        
+        
         self.addToolBar(QtCore.Qt.TopToolBarArea ,toolbar)
         self.setCentralWidget(self.centralWidget)
         self.setupDock()
-        self.centralWidget.itemAddButton.clicked.connect(self.addItem)
-        self.centralWidget.removeItemButton.clicked.connect(self.removeItem)
         
         for scene in self.centralWidget.scenes:
             scene.selectionChanged.connect(self.getOptions)
@@ -516,8 +507,8 @@ class GraphicMainWin(QtGui.QMainWindow):
         
     def addItem(self):
         currentScene = self.centralWidget.graphicsView.scene()
-        posX = self.itemOptions.itemPosXBox.value()
-        posY = self.itemOptions.itemPosYBox.value()
+        posX = self.itemOptions.itemPosXBox.value()+10
+        posY = self.itemOptions.itemPosYBox.value()+10
         width = self.itemOptions.itemWidthBox.value()
         height = self.itemOptions.itemHeightBox.value()
         stroke = self.itemOptions.penColorPicker.slider.value()
@@ -529,9 +520,10 @@ class GraphicMainWin(QtGui.QMainWindow):
                                         label = label,command = command,stroke = stroke,fill = fill,
                                         type = typeStr)
     def removeItem(self):
-        selectedItems = self.centralWidget.scene.selectedItems()
+        currentScene = self.centralWidget.graphicsView.scene()
+        selectedItems = currentScene.selectedItems()
         for item in selectedItems:
-            self.centralWidget.scene.removeItem(item)
+            currentScene.removeItem(item)
         
     def setupDock(self):
         dock = QtGui.QDockWidget('Item Options', self)
