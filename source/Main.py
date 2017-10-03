@@ -436,34 +436,40 @@ class CentralWidget(QtGui.QWidget):
         super(CentralWidget, self).__init__(parent)
         self.mainLayout = QtGui.QVBoxLayout(objectName = 'mainLayout')
         self.setLayout(self.mainLayout)
+        self.tabWidget = QtGui.QTabWidget()
         
-        defaultScene = BoxScene()
-        self.scenes = [defaultScene]
+        self.scenes = []
+        self.graphicsViews = []
+        self.mainLayout.addWidget(self.tabWidget)
         
-        itemWidget = QtGui.QGroupBox()
-        itemLayout = QtGui.QHBoxLayout()
-        itemWidget.setLayout(itemLayout)
+    def addTab(self,label='temp'):
+        tabItem = QtGui.QWidget()
+        tabLayout = QtGui.QHBoxLayout()
+        tabItem.setLayout(tabLayout)
         
-        self.graphicsView = GraphicsView() 
-        self.graphicsView.setBackgroundBrush(QtGui.QBrush(QtCore.Qt.gray, QtCore.Qt.SolidPattern))
-        self.graphicsView.setScene(defaultScene)
-        
-        self.mainLayout.addWidget(self.graphicsView)
-        self.mainLayout.addWidget(itemWidget)
-        
-    def addScene(self,scene):
-        self.graphicsView.setScene(scene)
+        scene = BoxScene()
         self.scenes.append(scene)
+        self.tabWidget.addTab(tabItem,label)
+        graphicsView = GraphicsView() 
+        self.graphicsViews.append(graphicsView)
+        graphicsView.setBackgroundBrush(QtGui.QBrush(QtCore.Qt.gray, QtCore.Qt.SolidPattern))
+        graphicsView.setScene(scene)
+        tabLayout.addWidget(graphicsView)
         
 class ToolBar(QtGui.QToolBar):
     def __init__(self,parent = None):
         super(ToolBar, self).__init__(parent)
         addItemIcon = QtGui.QIcon('%s/addItemIcon.png'%iconDir)
         removeItemIcon = QtGui.QIcon('%s/removeItemIcon.png'%iconDir)
+        addSceneIcon = QtGui.QIcon('%s/addSceneIcon.png'%iconDir)
+        removeSceneIcon = QtGui.QIcon('%s/removeSceneIcon.png'%iconDir)
         
-        self.addItemAction = self.addAction(addItemIcon, "Add Item")
-        self.removeItemAction = self.addAction(removeItemIcon, "Remove Item")
+        self.addItemAction = self.addAction(addItemIcon, 'Add Item')
+        self.removeItemAction = self.addAction(removeItemIcon, 'Remove Item')
         self.addSeparator()
+        self.addSceneAction = self.addAction(addSceneIcon,'Add Scene')
+        self.removeSceneAction = self.addAction(removeSceneIcon,'Remove Scene')
+        #self.removeSceneAction.setEnabled(False)
             
 class GraphicMainWin(QtGui.QMainWindow):
     def __init__(self,parent = None):
@@ -479,26 +485,25 @@ class GraphicMainWin(QtGui.QMainWindow):
         self.setLayout(layout)
         
         self.centralWidget = CentralWidget(self)
-        scene = self.centralWidget.scenes[0]
+        self.addScene()
         centralLayout = QtGui.QHBoxLayout()
         self.centralWidget.setLayout(centralLayout)
  
         toolbar = ToolBar(self)
-        toolbar.addItemAction.triggered.connect(self.addItem)
-        toolbar.removeItemAction.triggered.connect(self.removeItem)        
-        
         self.addToolBar(QtCore.Qt.TopToolBarArea ,toolbar)
+        
+        toolbar.addItemAction.triggered.connect(self.addItem)
+        toolbar.removeItemAction.triggered.connect(self.removeItem)
+        toolbar.addSceneAction.triggered.connect(self.addScene)    
+        
+        
         self.setCentralWidget(self.centralWidget)
         self.setupDock()
-        
-        for scene in self.centralWidget.scenes:
-            scene.selectionChanged.connect(self.getOptions)
             
         self.itemOptions.itemWidthBox.valueChanged.connect(self.setItemWidth)
         self.itemOptions.itemHeightBox.valueChanged.connect(self.setItemHeight)
         self.itemOptions.itemPosXBox.valueChanged.connect(self.setItemPosX)
         self.itemOptions.itemPosYBox.valueChanged.connect(self.setItemPosY)
-        self.centralWidget.graphicsView.posSignal.connect(self.setItemPos)
         self.itemOptions.typeBox.activated.connect(self.setItemShape)
         self.itemOptions.boxText.textChanged.connect(self.setItemLabel)
         self.itemOptions.penColorPicker.slider.valueChanged.connect(self.setItemStroke)
@@ -506,7 +511,7 @@ class GraphicMainWin(QtGui.QMainWindow):
         self.itemOptions.boxCommandText.textChanged.connect(self.setItemCommand)
         
     def addItem(self):
-        currentScene = self.centralWidget.graphicsView.scene()
+        currentScene = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()]
         posX = self.itemOptions.itemPosXBox.value()+10
         posY = self.itemOptions.itemPosYBox.value()+10
         width = self.itemOptions.itemWidthBox.value()
@@ -520,10 +525,17 @@ class GraphicMainWin(QtGui.QMainWindow):
                                         label = label,command = command,stroke = stroke,fill = fill,
                                         type = typeStr)
     def removeItem(self):
-        currentScene = self.centralWidget.graphicsView.scene()
+        currentScene = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()]
         selectedItems = currentScene.selectedItems()
         for item in selectedItems:
             currentScene.removeItem(item)
+            
+    def addScene(self):
+        self.centralWidget.addTab('label')
+        for scene in self.centralWidget.scenes:
+            scene.selectionChanged.connect(self.getOptions)
+        for view in self.centralWidget.graphicsViews:
+            view.posSignal.connect(self.setItemPos) 
         
     def setupDock(self):
         dock = QtGui.QDockWidget('Item Options', self)
@@ -542,33 +554,33 @@ class GraphicMainWin(QtGui.QMainWindow):
 
        
     def setItemWidth(self,width):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             item.width = width
             item.update()
             item.move()
             
     def setItemHeight(self,height):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             item.height = height
             item.update()
             item.move()
             
     def setItemPosX(self,posX):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             item.posX = posX
             item.move()
             
     def setItemPosY(self,posY):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             item.posY = posY
             item.move()
             
     def setItemShape(self,shapeIndex):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             shapes = ['rect','roundRect','ellipse','polygon']
             item.type =  shapes[shapeIndex]
@@ -576,13 +588,13 @@ class GraphicMainWin(QtGui.QMainWindow):
             item.move()
             
     def setItemLabel(self,label):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             item.label = label
             item.update()
             
     def setItemStroke(self,colorIndex):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             color = ColorPickerSlider.colorFromIndex(colorIndex)
             item.penColor = QtGui.QColor(color[0],color[1],color[2])
@@ -590,7 +602,7 @@ class GraphicMainWin(QtGui.QMainWindow):
             item.update()
             
     def setItemBrush(self,colorIndex):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             color = ColorPickerSlider.colorFromIndex(colorIndex)
             item.brushColor = QtGui.QColor(color[0],color[1],color[2])
@@ -598,12 +610,12 @@ class GraphicMainWin(QtGui.QMainWindow):
             item.update()
             
     def setItemCommand(self):
-        selectedItem = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItem = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         for item in selectedItem:
             item.command = self.itemOptions.boxCommandText.toPlainText()
            
     def getOptions(self):
-        selectedItems = self.centralWidget.graphicsView.scene().selectedItems()
+        selectedItems = self.centralWidget.scenes[self.centralWidget.tabWidget.currentIndex()].selectedItems()
         if len(selectedItems) == 1:
             selectedItem = selectedItems[-1]
             pos = selectedItem.pos()
