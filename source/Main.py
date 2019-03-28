@@ -8,9 +8,7 @@ from PySide import QtCore,QtGui
 import sys
 import math
 
-filePath = __file__
-path = filePath.split('/Main.py')[0]
-iconDir = '%s/icons'%path
+iconDir = './icons'
 
 #graphics component
 class BoxItem(QtGui.QGraphicsItem):
@@ -463,12 +461,28 @@ class ToolBar(QtGui.QToolBar):
         removeItemIcon = QtGui.QIcon('%s/removeItemIcon.png'%iconDir)
         addSceneIcon = QtGui.QIcon('%s/addSceneIcon.png'%iconDir)
         removeSceneIcon = QtGui.QIcon('%s/removeSceneIcon.png'%iconDir)
+        '''
+        QWidgetAction *widgetAction = new QWidgetAction(this);
+        widgetAction->setDefaultWidget(new QProgressBar(this));
+        menubar.addAction(widgetAction);
+        '''
+        self.lineEditAction = QtGui.QWidgetAction(self)
+        self.lineEdit = QtGui.QLineEdit()
+        self.lineEdit.setMaximumWidth(125)
+        self.lineEditAction.setDefaultWidget(self.lineEdit)
+        tabNameLabel = QtGui.QLabel('Tab Name:')
+        
         
         self.addItemAction = self.addAction(addItemIcon, 'Add Item')
         self.removeItemAction = self.addAction(removeItemIcon, 'Remove Item')
         self.addSeparator()
         self.addSceneAction = self.addAction(addSceneIcon,'Add Scene')
         self.removeSceneAction = self.addAction(removeSceneIcon,'Remove Scene')
+        self.addWidget(tabNameLabel)
+        self.addAction(self.lineEditAction)
+        self.addSeparator()
+        
+        
         #self.removeSceneAction.setEnabled(False)
             
 class GraphicMainWin(QtGui.QMainWindow):
@@ -489,12 +503,15 @@ class GraphicMainWin(QtGui.QMainWindow):
         centralLayout = QtGui.QHBoxLayout()
         self.centralWidget.setLayout(centralLayout)
  
-        toolbar = ToolBar(self)
-        self.addToolBar(QtCore.Qt.TopToolBarArea ,toolbar)
+        self.toolbar = ToolBar(self)
+        self.addToolBar(QtCore.Qt.TopToolBarArea ,self.toolbar)
         
-        toolbar.addItemAction.triggered.connect(self.addItem)
-        toolbar.removeItemAction.triggered.connect(self.removeItem)
-        toolbar.addSceneAction.triggered.connect(self.addScene)    
+        self.toolbar.addItemAction.triggered.connect(self.addItem)
+        self.toolbar.removeItemAction.triggered.connect(self.removeItem)
+        self.toolbar.addSceneAction.triggered.connect(self.addScene) 
+        self.toolbar.lineEdit.textChanged.connect(self.setTabName)
+        
+        self.centralWidget.tabWidget.currentChanged.connect(self.setTabField)  
         
         
         self.setCentralWidget(self.centralWidget)
@@ -536,6 +553,14 @@ class GraphicMainWin(QtGui.QMainWindow):
             scene.selectionChanged.connect(self.getOptions)
         for view in self.centralWidget.graphicsViews:
             view.posSignal.connect(self.setItemPos) 
+            
+    def setTabName(self,name):
+        i = self.centralWidget.tabWidget.currentIndex()
+        self.centralWidget.tabWidget.setTabText(i,name)
+        
+    def setTabField(self,index):
+        tabName = self.centralWidget.tabWidget.tabText(index)
+        self.toolbar.lineEdit.setText(tabName)
         
     def setupDock(self):
         dock = QtGui.QDockWidget('Item Options', self)
